@@ -13,6 +13,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import utility.HttpConnection;
 
 import javax.inject.Inject;
 import java.io.IOException;
@@ -72,12 +73,8 @@ public class ClientValidationNode extends AbstractDecisionNode {
             sharedState.put("client-id", sub);
             HttpClient client = HttpClient.newBuilder().build();
             logger.info("sub: {}", sub);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(config.urlValue() + sub))
-                    .header("X-OpenIDM-Username", "openidm-admin")
-                    .header("X-OpenIDM-Password", "openidm-admin")
-                    .GET()
-                    .build();
+
+            HttpRequest request = HttpConnection.sendRequest(config.urlValue() + sub, "GET", null, null);
 
             HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
 
