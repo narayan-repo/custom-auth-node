@@ -1,7 +1,7 @@
 /*
  * jon.knight@forgerock.com
  *
- * Sets user profile attributes 
+ * Sets user profile attributes
  *
  */
 
@@ -24,57 +24,30 @@
 package org.forgerock.openam.auth.nodes;
 
 import com.google.inject.assistedinject.Assisted;
-
-import org.forgerock.json.JsonValue;
+import org.forgerock.json.jose.common.JwtReconstruction;
 import org.forgerock.json.jose.jws.JwsAlgorithm;
 import org.forgerock.json.jose.jws.SignedJwt;
 import org.forgerock.json.jose.jws.handlers.RSASigningHandler;
-import org.forgerock.json.schema.validator.Constants;
 import org.forgerock.openam.annotations.sm.Attribute;
+import org.forgerock.openam.auth.exception.JWTExpiredException;
+import org.forgerock.openam.auth.exception.JWTSignatureException;
 import org.forgerock.openam.auth.node.api.AbstractDecisionNode;
 import org.forgerock.openam.auth.node.api.Action;
 import org.forgerock.openam.auth.node.api.Node;
-import org.forgerock.openam.auth.node.api.NodeProcessException;
-import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
 import org.forgerock.openam.auth.node.api.TreeContext;
-import org.forgerock.json.jose.common.*;
-
-import javax.inject.Inject;
-import javax.security.auth.callback.NameCallback;
-import javax.security.auth.callback.PasswordCallback;
-import javax.security.auth.callback.Callback;
-
-import static org.forgerock.openam.auth.node.api.Action.send;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpResponse.BodyHandlers;
-import java.security.GeneralSecurityException;
-import java.security.Key;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.ResourceBundle;
-import java.util.stream.Collectors;
-
-//import org.forgerock.guava.common.base.Strings;
-import com.google.common.base.Strings;
+import org.forgerock.openam.utils.BundleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.inject.Inject;
+import java.security.Key;
+import java.security.KeyFactory;
 import java.security.PublicKey;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Base64;
+import java.util.Date;
 
 /**
  * A node which collects a username from the user via a name callback.
@@ -86,156 +59,133 @@ import java.time.ZoneId;
 @Node.Metadata(outcomeProvider = AbstractDecisionNode.OutcomeProvider.class, configClass = ClientAssertionValidatorNode.Config.class)
 public class ClientAssertionValidatorNode extends AbstractDecisionNode {
 
-	public interface Config {
-		@Attribute(order = 100)
-		default String variable() {
-			return "variable";
-		}
+    private static final String BUNDLE = "org/forgerock/openam/auth/nodes/ClientAssertionValidatorNode";
+    private final Logger logger = LoggerFactory.getLogger("amAuth");
+    private final ClientAssertionValidatorNode.Config config;
 
-		@Attribute(order = 200)
-		default String prompt() {
-			return "Prompt";
-		}
-
-		@Attribute(order = 300)
-		default Boolean isPassword() {
-			return false;
-		}
-
-		@Attribute(order = 400)
-		default Boolean useTransient() {
-			return true;
-		}
-	}
-
-	private static final String BUNDLE = "org/forgerock/openam/auth/nodes/ClientAssertionValidatorNode";
-	private final Logger logger = LoggerFactory.getLogger("amAuth");
-
-	private final ClientAssertionValidatorNode.Config config;
-
-	/**
-	 * Constructs a new SetSessionPropertiesNode instance.
-	 * 
-	 * @param config Node configuration.
-	 */
-	@Inject
-	public ClientAssertionValidatorNode(@Assisted ClientAssertionValidatorNode.Config config) {
-		this.config = config;
-	}
-
-	private SignedJwt getSignedJwt(String sJWT) throws Exception{ 
-    	System.out.println("start of getsignedJwt");
-    	SignedJwt signedJWT = null;
-    	try { 
-    		JwtReconstruction jwtReconstruction = new JwtReconstruction(); 
-    		signedJWT = jwtReconstruction.reconstructJwt(sJWT, SignedJwt.class); 
-    		System.out.println("end of getsignedJwt ::::" + signedJWT); 
-    	} catch (Exception ex) { 
-    		System.out.println("Exception in getsigned wt: "+ ex);
-    		throw new Exception("Could not reconstruct JWT");
-    	}
-    	System.out.println("end of getSignedJWT:::: " + signedJWT);
-    	return signedJWT;
+    /**
+     * Constructs a new SetSessionPropertiesNode instance.
+     *
+     * @param config Node configuration.
+     */
+    @Inject
+    public ClientAssertionValidatorNode(@Assisted ClientAssertionValidatorNode.Config config) {
+        this.config = config;
     }
-    
-    private boolean verifyJWSs(Key publicKey, String signedJWTs, JwsAlgorithm alg) {
-    	System.out.println("Start of Verify JWSs");
-    	String signedData = signedJWTs.substring(0, signedJWTs.lastIndexOf("."));
-    	String signatureB64u = signedJWTs.substring(signedJWTs.lastIndexOf(".") + 1, signedJWTs.length());
-    	byte[] signature = Base64.getUrlDecoder().decode(signatureB64u);
-    	RSASigningHandler rsaSigningHandler = new RSASigningHandler(publicKey);
-    	System.out.println("end of verify JWSs");
-    	return rsaSigningHandler.verify(alg, signedData.getBytes(), signature);
+
+    private SignedJwt getSignedJwt(String sJWT) throws Exception {
+        logger.info("Start of getSignedJwt method");
+        SignedJwt signedJWT;
+        try {
+            JwtReconstruction jwtReconstruction = new JwtReconstruction();
+            signedJWT = jwtReconstruction.reconstructJwt(sJWT, SignedJwt.class);
+            logger.info("Signed JWT :::: {}", signedJWT);
+        } catch (Exception ex) {
+            logger.error("Exception occurred while getting signed jwt: {}", ex.getLocalizedMessage());
+            throw new Exception("Could not reconstruct JWT");
+        }
+        logger.info("End of getSignedJwt :::: {}", signedJWT);
+        return signedJWT;
     }
-    
-    public PublicKey stringToRSAKey() throws InvalidKeySpecException, NoSuchAlgorithmException {
-        String publicKeyB64 = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAufecY+YT179E9ZJ5NcDN"
-        		+ "lvYZHZrDT+Xq/5fM5IGEJSME1DrJJ67j8PR7hUQ9ab7TiiVNzWhPDgPbmP0fD/Ao"
-        		+ "haRTdlfayg+lCeXDu0oYTLwBtqrn+aBN+Oi57UsjLUi05j+j62fJfP6D9+dbZSHi"
-        		+ "iNvc/0ETnG98IA2r8QFEM5qN3pprwOiVWa5nOb9BKvUix9HosDD3nGXpX18+/rtS"
-        		+ "DmIOUF7O0Rgm/XCLr6zeB4IIdnMyLJMfaW4HyarEdaAeXIn1NfWOMGSZMquv4xsa"
-        		+ "727F7Vd8eyf6WxD67hiPLh/G3nWPPbDAEGxynim6CYHFWtcg7o9AzuF8PCsas4OK"
-        		+ "+dE3lAQymvXqm+PS9wD0A3/KD/UZONLfjWUg6Rb2dVBbirl/2hI2QnSv9yAbXlmg"
-        		+ "z1fupElQNYAppjtK8ahU9Jvcupt7HIY1XYjc/XQhFU3cmZu7wAkZQd/8QFJntUT4"
-        		+ "M9MuhNx/rq0cdACDyg8hl6nR5Ghoq0ExqfE6PrTl1ty7oegLjBzMYI4zQyv4nVRW"
-        		+ "FqZUyCwLzeYFf8tkFhigOTogzklPPtKcyFxUYv/ScORl7n5yH/EkZsk1rK1xltu3"
-        		+ "mwEmIQU3uelH8MUvhBFbrv9ejhDNrWkkSolIOkZShAvMPwW8ILvBy1DL9WghtMKE"
-        		+ "noDBF0EDvzvoZMiD0r4KNLMCAwEAAQ==";
-        
-        
-        
-        try{
+
+    private boolean verifyJWSs(Key publicKey, String signedJWTs) {
+        logger.info("Start of verifyJWSs method");
+        String signedData = signedJWTs.substring(0, signedJWTs.lastIndexOf("."));
+        String signatureB64u = signedJWTs.substring(signedJWTs.lastIndexOf(".") + 1);
+        byte[] signature = Base64.getUrlDecoder().decode(signatureB64u);
+        RSASigningHandler rsaSigningHandler = new RSASigningHandler(publicKey);
+        logger.info("End of verifyJWSs");
+        return rsaSigningHandler.verify(JwsAlgorithm.RS256, signedData.getBytes(), signature);
+    }
+
+    public PublicKey stringToRSAKey() {
+        String publicKeyB64 = BundleUtils.getBundleString(BUNDLE, "publicKeyB64");
+
+        try {
             byte[] byteKey = Base64.getDecoder().decode(publicKeyB64.getBytes());
-	
+
             X509EncodedKeySpec X509publicKey = new X509EncodedKeySpec(byteKey);
             KeyFactory kf = KeyFactory.getInstance("RSA");
-            System.out.println(kf.generatePublic(X509publicKey));
+            logger.info("Generated public key: {}", kf.generatePublic(X509publicKey));
             return kf.generatePublic(X509publicKey);
+        } catch (Exception e) {
+            logger.error("Error converting string to RSAKey: {}", e.getLocalizedMessage());
+            return null;
         }
-        catch(Exception e){
-            e.printStackTrace();
-        }
-		return null;
     }
-    
-    public boolean verifyJWTExpiry(SignedJwt signedJWTs) throws GeneralSecurityException{
-    	System.out.println("Start of verifyJWTExpiry");
-    	Date jwtExp =   (Date) (signedJWTs.getClaimsSet().getClaim("exp")); 
-    	
+
+    public boolean verifyJWTExpiry(SignedJwt signedJWTs) {
+        logger.info("Start of verifyJWTExpiry");
+        Date jwtExp = (Date) (signedJWTs.getClaimsSet().getClaim("exp"));
+
         long secsFromEpoch = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().getEpochSecond();
         LocalDateTime ldt = LocalDateTime.ofInstant(jwtExp.toInstant(),
                 ZoneId.systemDefault());
         long jwtExpsecs = ldt.atZone(ZoneId.systemDefault()).toInstant().getEpochSecond();
-        
-        System.out.println("End of verifyJWTExpiry");
-    	return jwtExpsecs>secsFromEpoch;
-    }
-    
-	@Override
-	public Action process(TreeContext context) 
-	{
-		String token = context.request.headers.get("authorization").get(0).substring(7);
-		// Create Public key
-				PublicKey publicKey;
-				try {
-					publicKey = this.stringToRSAKey();
-					System.out.println(publicKey);
-				} catch (Exception e){
-					e.printStackTrace();
-					return goTo(false).build();
-				}
-				
-				//JWT Signature Validation
-				try {
-		    		Boolean validJWTSignature = this.verifyJWSs(publicKey, token, JwsAlgorithm.RS256);
-		    		if (validJWTSignature)
-		    		System.out.println("JWT Signature is valid");
-		    		else {
-		        		System.out.println("JWT Signature is invalid");
-		    			return goTo(false).build();    			
-		    		}
-		    		
-				} catch (Exception e) {
-		    		System.out.println("JWT Signature is invalid");
-		    		e.printStackTrace();
-					return goTo(false).build();    			
-		    	}
-				
-				//verify expiry
-				SignedJwt signedJwt = null;
-				try {
-					signedJwt = getSignedJwt(token);
-					Boolean validExp = verifyJWTExpiry(signedJwt);
-		    		if (validExp)
-		    		System.out.println("JWT is not expired");
-		    		else {
-		    			System.out.println("JWT is expired");
-						return goTo(false).build();    			
-		    		}
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-		return goTo(true).build();
 
-	}
+        logger.info("End of verifyJWTExpiry");
+        return jwtExpsecs > secsFromEpoch;
+    }
+
+    @Override
+    public Action process(TreeContext context) {
+        String token = context.request.headers.get("authorization").get(0).substring(7);
+        // Create Public key
+        PublicKey publicKey;
+        SignedJwt signedJwt;
+
+        try {
+            publicKey = this.stringToRSAKey();
+            logger.info("public key: {}", publicKey);
+
+            //JWT Signature Validation
+            boolean validJWTSignature = this.verifyJWSs(publicKey, token);
+            if (validJWTSignature) {
+                logger.info("JWT Signature is valid");
+            } else {
+                throw new JWTSignatureException("JWT Signature is invalid");
+            }
+
+            //Verify expiry
+            signedJwt = getSignedJwt(token);
+            boolean validExp = verifyJWTExpiry(signedJwt);
+            if (validExp) {
+                logger.info("JWT is not expired");
+            } else {
+                throw new JWTExpiredException("JWT is expired");
+            }
+
+        } catch (JWTSignatureException | JWTExpiredException e) {
+            logger.error("JWT validation failed: {}", e.getLocalizedMessage());
+            return goTo(false).build();
+        } catch (Exception e) {
+            logger.error("Exception occurred while validating JWT: {}", e.getLocalizedMessage());
+            return goTo(false).build();
+        }
+
+        return goTo(true).build();
+
+    }
+
+    public interface Config {
+        @Attribute(order = 100)
+        default String variable() {
+            return "variable";
+        }
+
+        @Attribute(order = 200)
+        default String prompt() {
+            return "Prompt";
+        }
+
+        @Attribute(order = 300)
+        default Boolean isPassword() {
+            return false;
+        }
+
+        @Attribute(order = 400)
+        default Boolean useTransient() {
+            return true;
+        }
+    }
 }

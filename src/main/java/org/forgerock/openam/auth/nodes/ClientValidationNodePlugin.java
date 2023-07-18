@@ -19,35 +19,36 @@
  * Needed to register the node
  */
 
- package org.forgerock.openam.auth.nodes;
-
-import java.util.Collections;
-import java.util.Map;
+package org.forgerock.openam.auth.nodes;
 
 import org.forgerock.openam.auth.node.api.AbstractNodeAmPlugin;
 import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.plugins.PluginException;
- 
- /**
-  * Core nodes installed by default with no engine dependencies.
-  */
- public class ClientValidationNodePlugin extends AbstractNodeAmPlugin { 
 
-  private static String currentVersion = "0.0.0";
+import java.util.Collections;
+import java.util.Map;
 
-  @Override
-  protected Map<String, Iterable<? extends Class<? extends Node>>>
-  getNodesByVersion() {
-    return Collections.singletonMap("1.0.0", Collections.singletonList(ClientValidationNode.class));
-  }
+/**
+ * Core nodes installed by default with no engine dependencies.
+ */
+public class ClientValidationNodePlugin extends AbstractNodeAmPlugin {
 
-  @Override
-  public String getPluginVersion() {
-    return ClientValidationNodePlugin.currentVersion;
-  }
-  @Override
-  public void upgrade(String fromVersion) throws PluginException {
-    pluginTools.upgradeAuthNode(ClientValidationNode.class);
-   
-  }
+    private static final String currentVersion = "0.0.0";
+
+    @Override
+    protected Map<String, Iterable<? extends Class<? extends Node>>>
+    getNodesByVersion() {
+        return Collections.singletonMap("1.0.0", Collections.singletonList(ClientValidationNode.class));
+    }
+
+    @Override
+    public String getPluginVersion() {
+        return ClientValidationNodePlugin.currentVersion;
+    }
+
+    @Override
+    public void upgrade(String fromVersion) throws PluginException {
+        pluginTools.upgradeAuthNode(ClientValidationNode.class);
+
+    }
 }

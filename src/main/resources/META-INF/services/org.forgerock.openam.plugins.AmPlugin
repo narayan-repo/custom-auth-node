@@ -14,12 +14,7 @@
 # Copyright 2017 ForgeRock AS.
 #
 
-org.forgerock.openam.auth.nodes.InputCollectorNodePlugin
 org.forgerock.openam.auth.nodes.GenerateAccessTokenNodePlugin
-org.forgerock.openam.auth.nodes.GetAuthorizedCodeNodePlugin
-org.forgerock.openam.auth.nodes.UpdateAccessTokenNodePlugin
-org.forgerock.openam.auth.nodes.JWTValidationNodePlugin
 org.forgerock.openam.auth.nodes.ConsentValidationNodePlugin
-org.forgerock.openam.auth.nodes.GetConsentIdNodePlugin
 org.forgerock.openam.auth.nodes.ConsentStatusUpdateNodePlugin
 org.forgerock.openam.auth.nodes.ClientValidationNodePlugin

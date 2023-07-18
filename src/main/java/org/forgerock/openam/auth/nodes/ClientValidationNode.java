@@ -1,4 +1,3 @@
-
 package org.forgerock.openam.auth.nodes;
 
 import com.google.inject.assistedinject.Assisted;
@@ -17,7 +16,6 @@ import utility.HttpConnection;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -27,26 +25,8 @@ import java.util.Base64;
 @Node.Metadata(outcomeProvider = AbstractDecisionNode.OutcomeProvider.class, configClass = ClientValidationNode.Config.class)
 public class ClientValidationNode extends AbstractDecisionNode {
 
-    public interface Config {
-        @Attribute(order = 100)
-        default String variable() {
-            return "variable";
-        }
-
-        @Attribute(order = 200)
-        default String prompt() {
-            return "Prompt";
-        }
-
-        @Attribute(order = 300)
-        default String urlValue() {
-            return "http://localhost:8081/openidm/softwareStatement/getClient/";
-        }
-    }
-
     private static final String BUNDLE = "org/forgerock/openam/auth/nodes/ClientValidationNode";
     private final Logger logger = LoggerFactory.getLogger("amAuth");
-
     private final ClientValidationNode.Config config;
 
     /**
@@ -91,5 +71,22 @@ public class ClientValidationNode extends AbstractDecisionNode {
         logger.info("Client: {} validated successfully", sharedState.get("client-id"));
         return goTo(true).replaceSharedState(sharedState).build();
 
+    }
+
+    public interface Config {
+        @Attribute(order = 100)
+        default String variable() {
+            return "variable";
+        }
+
+        @Attribute(order = 200)
+        default String prompt() {
+            return "Prompt";
+        }
+
+        @Attribute(order = 300)
+        default String urlValue() {
+            return "http://localhost:8081/openidm/softwareStatement/getClient/";
+        }
     }
 }

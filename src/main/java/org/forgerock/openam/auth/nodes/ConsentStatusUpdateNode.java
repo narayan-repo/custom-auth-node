@@ -1,15 +1,8 @@
 package org.forgerock.openam.auth.nodes;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.LocalDateTime;
-
-import javax.inject.Inject;
-
-import org.forgerock.json.JsonValue;
+import com.google.inject.assistedinject.Assisted;
 import org.forgerock.openam.annotations.sm.Attribute;
+import org.forgerock.openam.auth.exception.ConsentNotFoundException;
 import org.forgerock.openam.auth.node.api.Action;
 import org.forgerock.openam.auth.node.api.Node;
 import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
@@ -19,43 +12,30 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import utility.HttpConnection;
 
-import com.google.inject.assistedinject.Assisted;
+import javax.inject.Inject;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 
-@Node.Metadata(outcomeProvider = SingleOutcomeNode.OutcomeProvider.class,
-                configClass = ConsentStatusUpdateNode.Config.class)
+@Node.Metadata(outcomeProvider = SingleOutcomeNode.OutcomeProvider.class, configClass = ConsentStatusUpdateNode.Config.class)
 public class ConsentStatusUpdateNode extends SingleOutcomeNode {
-	public interface Config {
-        @Attribute(order = 100)
-        default String variable() { return "variable"; }
-
-        @Attribute(order = 200)
-        default String prompt() { return "Prompt"; }
-        
-        @Attribute(order=300)
-        default String urlValue()
-        {
-        	return "http://localhost:8081/openidm/endpoint/consent/?consentId=";
-        }
-        
-    }
-	
-	private static final String BUNDLE = "org/forgerock/openam/auth/nodes/ConsentStatusUpdateNode";
-	private final ConsentStatusUpdateNode.Config config;
+    private static final String BUNDLE = "org/forgerock/openam/auth/nodes/ConsentStatusUpdateNode";
+    private final ConsentStatusUpdateNode.Config config;
     private final Logger logger = LoggerFactory.getLogger("amAuth");
-	
-	@Inject
+    @Inject
     public ConsentStatusUpdateNode(@Assisted ConsentStatusUpdateNode.Config config) {
         this.config = config;
     }
 
-    public String update() throws JSONException{
-        
-         LocalDateTime now = LocalDateTime.now();
-        
+    public String update() throws JSONException {
 
-
+        LocalDateTime now = LocalDateTime.now();
 
         JSONObject jsonObject1 = new JSONObject(); //updating status
         JSONObject jsonObject2 = new JSONObject(); //updating status update time
@@ -69,48 +49,67 @@ public class ConsentStatusUpdateNode extends SingleOutcomeNode {
         jsonObject2.put("operation", "replace");
         jsonObject2.put("field", "/statusUpdateDateTime");
         jsonObject2.put("value", now.toString());
-        
+
         jsonArray.put(jsonObject1);
         jsonArray.put(jsonObject2);
 
         return jsonArray.toString();
     }
 
-	@Override
-	public Action process(TreeContext context) {
-        
-        System.out.println("Consent Status Update Node");
-        
+    @Override
+    public Action process(TreeContext context) {
+
+        logger.info("Consent Status Update Node");
+
         String consentId = context.sharedState.get("consentId").asString();
-        System.out.println("Consent Id: "+consentId);
-        JsonValue sharedState = context.sharedState;
+        logger.info("Consent Id: {}", consentId);
 
         HttpRequest request;
+        HttpResponse<String> response;
         try {
-            request = HttpRequest.newBuilder()
-                    .uri(URI.create(this.config.urlValue() + consentId))
-                    .header("X-OpenIDM-Username", "openidm-admin")
-                    .header("X-OpenIDM-Password", "openidm-admin")
-                    .header("Content-Type", "application/json")
-                    .method("PATCH", HttpRequest.BodyPublishers.ofString(update()))
-                    .build();
-       
 
-        HttpResponse<String> response = null;
+            Map<String, String> headersMap = new HashMap<>();
+            headersMap.put("Content-Type", "application/json");
 
+            request = HttpConnection.sendRequest(this.config.urlValue() + consentId, "PATCH", headersMap, update());
             response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() == 404) {
+                throw new ConsentNotFoundException("Consent with consentId: " + consentId + "does not exist");
+            }
+
             JSONObject obj = new JSONObject(response.body());
-            System.out.println(obj.toString());
-            
+            logger.info(obj.toString());
+            System.out.println(response.body());
+
+        } catch (ConsentNotFoundException e) {
+            logger.warn("Consent update failed: {}", e.getLocalizedMessage());
+            return Action.goTo("false").build();
         } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("Status Not Updated");
+            logger.error("Error updating consent: {}", e.getLocalizedMessage());
+            return Action.goTo("false").build();
         }
-        System.out.println("Status Updated");
+        logger.info("Status Updated");
         return goToNext().build();
 
     }
 
-    
+    public interface Config {
+        @Attribute(order = 100)
+        default String variable() {
+            return "variable";
+        }
+
+        @Attribute(order = 200)
+        default String prompt() {
+            return "Prompt";
+        }
+
+        @Attribute(order = 300)
+        default String urlValue() {
+            return "http://localhost:8081/openidm/endpoint/consent/?consentId=";
+        }
+
+    }
+
 }

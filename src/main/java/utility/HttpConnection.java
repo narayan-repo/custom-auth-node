@@ -5,6 +5,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -16,44 +17,26 @@ public class HttpConnection {
     public static HttpRequest sendRequest(String url, String method, Map<String, String> headersMap,
                                           String requestBody) throws UnsupportedEncodingException {
 
-        HttpRequest request;
+        HttpRequest.Builder builder = HttpRequest.newBuilder();
+        builder.uri(URI.create(url))
+                .header("X-OpenIDM-Username", "openidm-admin")
+                .header("X-OpenIDM-Password", "openidm-admin");
 
-        if (headersMap == null || method.equalsIgnoreCase("GET")) {
-            request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("X-OpenIDM-Username", "openidm-admin")
-                    .header("X-OpenIDM-Password", "openidm-admin")
-                    .GET()
-                    .build();
+        if (method.equalsIgnoreCase("GET")) {
+            builder.method(method, HttpRequest.BodyPublishers.noBody());
         } else {
-            request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("X-OpenIDM-Username", "openidm-admin")
-                    .header("X-OpenIDM-Password", "openidm-admin")
-                    .headers(getRequestBody(headersMap, requestBody))
-                    .method(method.toUpperCase(), HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-        }
+            //initializing headers map if null
+            if (headersMap == null)
+                headersMap = new HashMap<>();
 
-        return request;
-    }
-
-    private static String getRequestBody(Map<String, String> headersMap, String requestBody) {
-
-        StringBuilder builder = new StringBuilder();
-        for (Entry<String, String> header : headersMap.entrySet()) {
-            if (header.getKey().equals("Content-Type")
-                    && header.getValue().equals("application/x-www-form-urlencoded")) {
-                requestBody = URLEncoder.encode(requestBody, StandardCharsets.UTF_8);
+            //adding headers to http-request builder
+            for (Entry<String, String> header : headersMap.entrySet()) {
+                builder.setHeader(header.getKey(), header.getValue());
             }
-            // adding header
-            builder.append("\"").append(header.getKey()).append("\"").append(",");
-            // adding value
-            builder.append("\"").append(header.getValue()).append("\"").append(",");
+            builder.method(method.toUpperCase(),
+                    requestBody == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(requestBody));
         }
-
-        //removing comma at the end
-        builder.deleteCharAt(builder.length() - 1);
-        return builder.toString();
+        return builder.build();
     }
+
 }
