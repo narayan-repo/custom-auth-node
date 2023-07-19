@@ -92,7 +92,7 @@ public class ConsentValidationNode extends AbstractDecisionNode {
 
         @Attribute(order = 300)
         default String urlValue() {
-            return "http://localhost:8081/openidm/endpoint/consent/?consentId=";
+            return "http://localhost:8081/openidm/endpoint/consent?clientName=";
         }
 
     }

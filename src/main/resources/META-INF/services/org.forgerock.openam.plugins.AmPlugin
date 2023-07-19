@@ -18,3 +18,4 @@ org.forgerock.openam.auth.nodes.GenerateAccessTokenNodePlugin
 org.forgerock.openam.auth.nodes.ConsentValidationNodePlugin
 org.forgerock.openam.auth.nodes.ConsentStatusUpdateNodePlugin
 org.forgerock.openam.auth.nodes.ClientValidationNodePlugin
+org.forgerock.openam.auth.nodes.ClientAssertionValidatorNodePlugin

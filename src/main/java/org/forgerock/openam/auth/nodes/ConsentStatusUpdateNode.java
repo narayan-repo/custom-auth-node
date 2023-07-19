@@ -107,7 +107,7 @@ public class ConsentStatusUpdateNode extends SingleOutcomeNode {
 
         @Attribute(order = 300)
         default String urlValue() {
-            return "http://localhost:8081/openidm/endpoint/consent/?consentId=";
+            return "http://localhost:8080/openidm/managed/Consent/";
         }
 
     }

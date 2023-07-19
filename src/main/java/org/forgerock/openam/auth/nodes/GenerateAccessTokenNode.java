@@ -4,10 +4,7 @@ import com.google.inject.assistedinject.Assisted;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.exception.AccessTokenGenerationException;
-import org.forgerock.openam.auth.node.api.Action;
-import org.forgerock.openam.auth.node.api.Node;
-import org.forgerock.openam.auth.node.api.SingleOutcomeNode;
-import org.forgerock.openam.auth.node.api.TreeContext;
+import org.forgerock.openam.auth.node.api.*;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -24,9 +21,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-@Node.Metadata(outcomeProvider = SingleOutcomeNode.OutcomeProvider.class,
+@Node.Metadata(outcomeProvider = AbstractDecisionNode.OutcomeProvider.class,
         configClass = GenerateAccessTokenNode.Config.class)
-public class GenerateAccessTokenNode extends SingleOutcomeNode {
+public class GenerateAccessTokenNode extends AbstractDecisionNode{
     private static final String BUNDLE = "org/forgerock/openam/auth/nodes/GenerateAccessTokenNode";
     private final GenerateAccessTokenNode.Config config;
     private final Logger logger = LoggerFactory.getLogger("amAuth");
@@ -83,10 +80,9 @@ public class GenerateAccessTokenNode extends SingleOutcomeNode {
         String accessToken;
         try {
 
-            String data = "grant_type=" + grantType + "&code=" + authCode + "&client_id=" + clientId;
+            String data = "grant_type=" + grantType + "&code=" + authCode;
 
             Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/x-www-form-urlencoded");
             headers.put("Authorization", "Basic " + encodedAuthorization);
 
             HttpRequest request = HttpConnection.sendRequest(url + "?" + data, "POST", headers, null);
@@ -106,16 +102,13 @@ public class GenerateAccessTokenNode extends SingleOutcomeNode {
             sharedState.put("accessToken", accessToken);
 
             logger.info("Access Token: " + accessToken);
-            System.out.println("Access Token: " + accessToken);
-            return goToNext().putSessionProperty("accessToken", accessToken).replaceSharedState(context.sharedState.copy().put(config.variable(), accessToken)).build();
+            return goTo(true).putSessionProperty("accessToken", accessToken).replaceSharedState(sharedState).build();
         } catch (JSONException | AccessTokenGenerationException e) {
             logger.error(e.getLocalizedMessage());
-            System.out.println(e.getLocalizedMessage());
-            return Action.goTo("failure").build();
+            return goTo(false).build();
         } catch (Exception e) {
             logger.error("Exception occurred while generating access token: {}", e.getLocalizedMessage());
-            System.out.println(e.getLocalizedMessage());
-            return Action.goTo("failure").build();
+            return goTo(false).build();
         }
 
     }

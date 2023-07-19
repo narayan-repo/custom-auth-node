@@ -24,6 +24,7 @@
 package org.forgerock.openam.auth.nodes;
 
 import com.google.inject.assistedinject.Assisted;
+import org.forgerock.json.JsonValue;
 import org.forgerock.json.jose.common.JwtReconstruction;
 import org.forgerock.json.jose.jws.JwsAlgorithm;
 import org.forgerock.json.jose.jws.SignedJwt;
@@ -130,6 +131,10 @@ public class ClientAssertionValidatorNode extends AbstractDecisionNode {
     @Override
     public Action process(TreeContext context) {
         String token = context.request.headers.get("authorization").get(0).substring(7);
+        String authCode = context.request.headers.get("code").get(0);
+
+        JsonValue sharedState = context.sharedState;
+        sharedState.put("authCode", authCode);
         // Create Public key
         PublicKey publicKey;
         SignedJwt signedJwt;
@@ -163,7 +168,7 @@ public class ClientAssertionValidatorNode extends AbstractDecisionNode {
             return goTo(false).build();
         }
 
-        return goTo(true).build();
+        return goTo(true).replaceSharedState(sharedState).build();
 
     }
 

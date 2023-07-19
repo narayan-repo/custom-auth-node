@@ -86,7 +86,7 @@ public class ClientValidationNode extends AbstractDecisionNode {
 
         @Attribute(order = 300)
         default String urlValue() {
-            return "http://localhost:8081/openidm/softwareStatement/getClient/";
+            return "http://localhost:8080/openidm/endpoint/soft?clientName=";
         }
     }
 }
